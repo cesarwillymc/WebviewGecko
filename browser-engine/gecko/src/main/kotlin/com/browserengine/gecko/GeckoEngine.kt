@@ -14,6 +14,7 @@ import com.browserengine.core.capabilities.CookieCapable
 import com.browserengine.core.capabilities.HistoryEntry
 import com.browserengine.core.capabilities.JsCapable
 import com.browserengine.core.capabilities.MediaCapable
+import com.browserengine.core.capabilities.MessagingBridgeCapable
 import com.browserengine.core.capabilities.MediaPolicy
 import com.browserengine.core.capabilities.MediaSource
 import com.browserengine.core.capabilities.MixedContentMode
@@ -48,6 +49,8 @@ import org.mozilla.geckoview.GeckoRuntimeSettings
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoView
 import org.mozilla.geckoview.GeckoSession.Loader
+import org.mozilla.geckoview.WebExtension
+import org.json.JSONObject
 import kotlin.reflect.KClass
 
 /**
@@ -69,7 +72,8 @@ class GeckoEngine(
     NetworkCapable,
     MediaCapable,
     PopupCapable,
-    NavigationInterceptCapable {
+    NavigationInterceptCapable,
+    MessagingBridgeCapable {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -99,8 +103,65 @@ class GeckoEngine(
         setSession(this@GeckoEngine.session)
     }
 
+    private val messageListeners = mutableListOf<MessagingBridgeCapable.MessageListener>()
+    private var onErrorHandler: ((String) -> Unit)? = null
+    private var onReadJsonHandler: ((String) -> Unit)? = null
+    private val messagingPorts = mutableListOf<WebExtension.Port>()
+
     init {
         session.open(runtime)
+        installMessagingExtension()
+    }
+
+    private fun installMessagingExtension() {
+        runtime.webExtensionController.ensureBuiltIn(
+            "resource://android/assets/messaging/",
+            "messaging@browserengine.example.com"
+        ).accept(
+            { extension ->
+                if (extension == null) return@accept
+                val delegate = object : WebExtension.MessageDelegate {
+                    override fun onConnect(port: WebExtension.Port) {
+                        messagingPorts.add(port)
+                        port.setDelegate(object : WebExtension.PortDelegate {
+                            override fun onPortMessage(message: Any, port: WebExtension.Port) {
+                                // Messages from content script - already handled via port
+                            }
+                            override fun onDisconnect(port: WebExtension.Port) {
+                                messagingPorts.remove(port)
+                            }
+                        })
+                    }
+
+                    override fun onMessage(
+                        nativeApp: String,
+                        message: Any,
+                        sender: WebExtension.MessageSender
+                    ): GeckoResult<Any>? {
+                        val text = when (message) {
+                            is JSONObject -> message.optString("text", message.optString("message", message.toString()))
+                            is String -> message
+                            else -> message.toString()
+                        }
+                        val method = (message as? JSONObject)?.optString("method", "onReadJson") ?: "onReadJson"
+                        when (method) {
+                            "onError" -> onErrorHandler?.invoke(text)
+                            "onReadJson" -> onReadJsonHandler?.invoke(text)
+                        }
+                        val response = messageListeners.asSequence()
+                            .mapNotNull { it.onMessage(text) }
+                            .firstOrNull()
+                        return if (response != null) {
+                            GeckoResult.fromValue(JSONObject().apply { put("reply", response) })
+                        } else {
+                            GeckoResult.fromValue(null)
+                        }
+                    }
+                }
+                session.webExtensionController.setMessageDelegate(extension, delegate, "browser")
+            },
+            { e -> android.util.Log.e("GeckoEngine", "Messaging extension install failed", e) }
+        )
     }
 
     private var defaultHeaders: Map<String, String> = emptyMap()
@@ -273,6 +334,7 @@ class GeckoEngine(
         MediaCapable::class -> this as T
         PopupCapable::class -> this as T
         NavigationInterceptCapable::class -> this as T
+        MessagingBridgeCapable::class -> this as T
         else -> null
     }
 
@@ -294,6 +356,36 @@ class GeckoEngine(
 
     override suspend fun postMessageToJs(channel: String, data: String): Result<Unit> =
         Result.failure(UnsupportedOperationException("GeckoView requires WebExtension"))
+
+    // MessagingBridgeCapable
+    override val bridgeName: String get() = "browser"
+
+    override fun setOnErrorHandler(handler: ((jsonMessage: String) -> Unit)?) {
+        onErrorHandler = handler
+    }
+
+    override fun setOnReadJsonHandler(handler: ((jsonMessage: String) -> Unit)?) {
+        onReadJsonHandler = handler
+    }
+
+    override fun addMessageListener(listener: MessagingBridgeCapable.MessageListener) {
+        messageListeners.add(listener)
+    }
+
+    override fun removeMessageListener(listener: MessagingBridgeCapable.MessageListener) {
+        messageListeners.remove(listener)
+    }
+
+    override fun postMessage(message: String) {
+        val payload = JSONObject().apply { put("text", message) }
+        messagingPorts.forEach { port ->
+            try {
+                port.postMessage(payload)
+            } catch (e: Exception) {
+                android.util.Log.w("GeckoEngine", "postMessage to port failed", e)
+            }
+        }
+    }
 
     override fun onPermissionRequested(
         permissions: List<com.browserengine.core.capabilities.BrowserPermission>,

@@ -3,6 +3,7 @@ package com.browserengine.webview
 import android.annotation.SuppressLint
 import android.content.Context
 import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -23,6 +24,7 @@ import com.browserengine.core.capabilities.HistoryEntry
 import com.browserengine.core.capabilities.InterceptResult
 import com.browserengine.core.capabilities.JsCapable
 import com.browserengine.core.capabilities.MediaCapable
+import com.browserengine.core.capabilities.MessagingBridgeCapable
 import com.browserengine.core.capabilities.MediaPolicy
 import com.browserengine.core.capabilities.MediaSource
 import com.browserengine.core.capabilities.MixedContentMode
@@ -73,7 +75,8 @@ class WebViewEngine(
     NetworkCapable,
     MediaCapable,
     PopupCapable,
-    NavigationInterceptCapable {
+    NavigationInterceptCapable,
+    MessagingBridgeCapable {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -86,6 +89,24 @@ class WebViewEngine(
     private val _grantedPermissions = MutableStateFlow<Set<com.browserengine.core.capabilities.BrowserPermission>>(emptySet())
     override val grantedPermissions: StateFlow<Set<com.browserengine.core.capabilities.BrowserPermission>> =
         _grantedPermissions.asStateFlow()
+
+    private val messageListeners = mutableListOf<MessagingBridgeCapable.MessageListener>()
+    private var onErrorHandler: ((String) -> Unit)? = null
+    private var onReadJsonHandler: ((String) -> Unit)? = null
+
+    private val webViewBridge = object {
+        @JavascriptInterface
+        fun onError(message: String) {
+            this@WebViewEngine.onErrorHandler?.invoke(message)
+            this@WebViewEngine.messageListeners.forEach { it.onMessage(message) }
+        }
+
+        @JavascriptInterface
+        fun onReadJson(message: String) {
+            this@WebViewEngine.onReadJsonHandler?.invoke(message)
+            this@WebViewEngine.messageListeners.forEach { it.onMessage(message) }
+        }
+    }
 
     val webView: WebView = WebView(context).apply {
         settings.apply {
@@ -106,6 +127,7 @@ class WebViewEngine(
         }
         webViewClient = createWebViewClient()
         webChromeClient = createWebChromeClient()
+        addJavascriptInterface(webViewBridge, bridgeName)
     }
 
     private var defaultHeaders: Map<String, String> = emptyMap()
@@ -266,6 +288,7 @@ class WebViewEngine(
             MediaCapable::class -> this as T
             PopupCapable::class -> this as T
             NavigationInterceptCapable::class -> this as T
+            MessagingBridgeCapable::class -> this as T
             else -> null
         }
     }
@@ -312,6 +335,41 @@ class WebViewEngine(
 
     override suspend fun postMessageToJs(channel: String, data: String): Result<Unit> =
         evaluateScript("window.postMessage?.({channel:'$channel',data:'$data'},'*')").map { }
+
+    // MessagingBridgeCapable
+    override val bridgeName: String get() = "Android"
+
+    override fun setOnErrorHandler(handler: ((jsonMessage: String) -> Unit)?) {
+        onErrorHandler = handler
+    }
+
+    override fun setOnReadJsonHandler(handler: ((jsonMessage: String) -> Unit)?) {
+        onReadJsonHandler = handler
+    }
+
+    override fun addMessageListener(listener: MessagingBridgeCapable.MessageListener) {
+        messageListeners.add(listener)
+    }
+
+    override fun removeMessageListener(listener: MessagingBridgeCapable.MessageListener) {
+        messageListeners.remove(listener)
+    }
+
+    override fun postMessage(message: String) {
+        val escaped = message.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")
+        scope.launch {
+            evaluateScript(
+                """
+                (function() {
+                    if (typeof window.onAndroidMessage === 'function') {
+                        window.onAndroidMessage('$escaped');
+                    }
+                    window.postMessage({ type: 'FROM_ANDROID', data: '$escaped' }, '*');
+                })();
+                """.trimIndent()
+            )
+        }
+    }
 
     // PermissionCapable
     fun setPermissionRequestHandler(handler: ((List<com.browserengine.core.capabilities.BrowserPermission>, () -> Unit, () -> Unit) -> Unit)?) {
