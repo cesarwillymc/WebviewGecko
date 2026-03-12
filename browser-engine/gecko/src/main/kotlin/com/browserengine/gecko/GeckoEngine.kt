@@ -41,11 +41,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.mozilla.geckoview.AllowOrDeny
 import org.mozilla.geckoview.GeckoResult
+import org.mozilla.geckoview.ContentBlocking
 import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoRuntimeSettings
+import org.mozilla.geckoview.StorageController
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoView
 import org.mozilla.geckoview.GeckoSession.Loader
@@ -59,7 +62,7 @@ import kotlin.reflect.KClass
  */
 class GeckoEngine(
     private val context: Context,
-    config: BrowserConfig = BrowserConfig()
+    private val config: BrowserConfig = BrowserConfig()
 ) : BrowserEngine,
     UICapable,
     JsCapable,
@@ -89,7 +92,13 @@ class GeckoEngine(
 
     private val runtime: GeckoRuntime = GeckoRuntime.create(
         context,
-        GeckoRuntimeSettings.Builder().build()
+        GeckoRuntimeSettings.Builder()
+            .contentBlocking(
+                ContentBlocking.Settings.Builder()
+                    .cookieBehavior(if (config.cookiesEnabled) ContentBlocking.CookieBehavior.ACCEPT_ALL else ContentBlocking.CookieBehavior.ACCEPT_NONE)
+                    .build()
+            )
+            .build()
     )
 
     val session: GeckoSession = GeckoSession().apply {
@@ -418,11 +427,43 @@ class GeckoEngine(
         onSelected(videoSources.firstOrNull(), audioSources.firstOrNull())
     }
 
+    override fun setCookiesEnabled(enabled: Boolean) {
+        // Gecko: cookie behavior is set at runtime creation via config.cookiesEnabled.
+        // Cannot change at runtime; use BrowserConfig(cookiesEnabled = ...) when creating the engine.
+        android.util.Log.w("GeckoEngine", "setCookiesEnabled: Gecko requires config at creation; current config.cookiesEnabled=${config.cookiesEnabled}")
+    }
+
     override suspend fun getCookies(url: String): List<com.browserengine.core.capabilities.BrowserCookie> = emptyList()
-    override suspend fun setCookie(url: String, cookie: com.browserengine.core.capabilities.BrowserCookie) = Unit
-    override suspend fun clearCookies() = Unit
-    override suspend fun clearCookiesFor(url: String) = Unit
-    override fun setThirdPartyCookiesEnabled(enabled: Boolean) {}
+
+    override suspend fun setCookie(url: String, cookie: com.browserengine.core.capabilities.BrowserCookie) {
+        // GeckoView has no public API to set individual cookies.
+    }
+
+    override suspend fun clearCookies() = withContext(Dispatchers.Main) {
+        suspendCancellableCoroutine<Unit> { cont ->
+            runtime.storageController.clearData(StorageController.ClearFlags.COOKIES)
+                .then(
+                    { cont.resume(Unit) },
+                    { cont.resumeWith(Result.failure(it)) }
+                )
+        }
+    }
+
+    override suspend fun clearCookiesFor(url: String) = withContext(Dispatchers.Main) {
+        val host = try { java.net.URL(url).host } catch (_: Exception) { return@withContext }
+        suspendCancellableCoroutine<Unit> { cont ->
+            runtime.storageController.clearDataFromHost(host, StorageController.ClearFlags.COOKIES)
+                .then(
+                    { cont.resume(Unit) },
+                    { cont.resumeWith(Result.failure(it)) }
+                )
+        }
+    }
+
+    override fun setThirdPartyCookiesEnabled(enabled: Boolean) {
+        // Gecko: use ContentBlocking.CookieBehavior.ACCEPT_FIRST_PARTY to block third-party.
+        // Set at runtime creation via ContentBlocking.Settings.
+    }
 
     override suspend fun clearCache() = withContext(Dispatchers.Main) { Unit }
 

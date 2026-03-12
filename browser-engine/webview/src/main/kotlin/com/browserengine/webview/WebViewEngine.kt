@@ -109,6 +109,7 @@ class WebViewEngine(
     }
 
     val webView: WebView = WebView(context).apply {
+        CookieManager.getInstance().setAcceptCookie(config.cookiesEnabled)
         settings.apply {
             javaScriptEnabled = config.javaScriptEnabled
             domStorageEnabled = config.domStorageEnabled
@@ -402,6 +403,10 @@ class WebViewEngine(
     }
 
     // CookieCapable
+    override fun setCookiesEnabled(enabled: Boolean) {
+        CookieManager.getInstance().setAcceptCookie(enabled)
+    }
+
     override suspend fun getCookies(url: String): List<com.browserengine.core.capabilities.BrowserCookie> =
         withContext(Dispatchers.Main) {
             CookieManager.getInstance().getCookie(url)?.split(";")?.mapNotNull { part ->
