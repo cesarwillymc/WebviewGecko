@@ -1,8 +1,0 @@
-com.browserengine.factory-pngs-0 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/factory/build/generated/res/pngs/debug
-com.browserengine.factory-updated_navigation_xml-1 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/factory/build/generated/updated_navigation_xml/debug
-com.browserengine.factory-mergeDebugResources-2 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/factory/build/intermediates/incremental/debug/mergeDebugResources/merged.dir
-com.browserengine.factory-mergeDebugResources-3 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/factory/build/intermediates/incremental/debug/mergeDebugResources/stripped.dir
-com.browserengine.factory-debug-4 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/factory/build/intermediates/merged_res/debug/mergeDebugResources
-com.browserengine.factory-debug-5 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/factory/build/intermediates/packaged_res/debug/packageDebugResources
-com.browserengine.factory-debug-6 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/factory/src/debug/res
-com.browserengine.factory-main-7 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/factory/src/main/res
