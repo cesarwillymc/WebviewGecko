@@ -1,0 +1,8 @@
+com.browserengine.webview-pngs-0 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/webview/build/generated/res/pngs/debug
+com.browserengine.webview-updated_navigation_xml-1 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/webview/build/generated/updated_navigation_xml/debug
+com.browserengine.webview-mergeDebugResources-2 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/webview/build/intermediates/incremental/debug/mergeDebugResources/merged.dir
+com.browserengine.webview-mergeDebugResources-3 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/webview/build/intermediates/incremental/debug/mergeDebugResources/stripped.dir
+com.browserengine.webview-debug-4 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/webview/build/intermediates/merged_res/debug/mergeDebugResources
+com.browserengine.webview-debug-5 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/webview/build/intermediates/packaged_res/debug/packageDebugResources
+com.browserengine.webview-debug-6 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/webview/src/debug/res
+com.browserengine.webview-main-7 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/webview/src/main/res
