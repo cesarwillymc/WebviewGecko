@@ -7,6 +7,8 @@ package com.example.webviewgecko
  * Created 3/12/26
  */
 object Script {
+    val robinhoodULR ="https://robinhood.com/login"
+    val ibkrURL ="https://portal.interactivebrokers.com/sso/Login"
     val robinhood= """
         "use strict";
         var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {

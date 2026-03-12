@@ -1,6 +1,7 @@
 package com.browserengine.gecko
 
 import android.content.Context
+import android.util.Log
 import com.browserengine.core.BrowserCapability
 import com.browserengine.core.BrowserConfig
 import com.browserengine.core.BrowserEngine
@@ -125,18 +126,23 @@ class GeckoEngine(
     private fun installMessagingExtension() {
         runtime.webExtensionController.ensureBuiltIn(
             "resource://android/assets/messaging/",
-            "messaging@browserengine.example.com"
+            "messaging@bautopilot.bridge.com"
         ).accept(
+
             { extension ->
                 if (extension == null) return@accept
                 val delegate = object : WebExtension.MessageDelegate {
                     override fun onConnect(port: WebExtension.Port) {
+                        Log.d("ScriptInjection", "onConnect ${port.name} ${port.sender.environmentType} ${port.sender.url} ${port.sender.session?.userAgent}")
                         messagingPorts.add(port)
                         port.setDelegate(object : WebExtension.PortDelegate {
                             override fun onPortMessage(message: Any, port: WebExtension.Port) {
+                                Log.d("ScriptInjection", "onPortMessage: $message")
+
                                 // Messages from content script - already handled via port
                             }
                             override fun onDisconnect(port: WebExtension.Port) {
+                                Log.d("ScriptInjection", "onDisconnect ${port.name}")
                                 messagingPorts.remove(port)
                             }
                         })
@@ -147,6 +153,7 @@ class GeckoEngine(
                         message: Any,
                         sender: WebExtension.MessageSender
                     ): GeckoResult<Any>? {
+                        Log.d("ScriptInjection", "onMessage: $message")
                         val text = when (message) {
                             is JSONObject -> message.optString("text", message.optString("message", message.toString()))
                             is String -> message
@@ -167,7 +174,9 @@ class GeckoEngine(
                         }
                     }
                 }
-                session.webExtensionController.setMessageDelegate(extension, delegate, "browser")
+                scope.launch {
+                    session.webExtensionController.setMessageDelegate(extension, delegate, "browser")
+                }
             },
             { e -> android.util.Log.e("GeckoEngine", "Messaging extension install failed", e) }
         )
@@ -376,8 +385,22 @@ class GeckoEngine(
 
     override fun registerNativeFunction(name: String, handler: (args: String) -> String) {}
 
-    override suspend fun postMessageToJs(channel: String, data: String): Result<Unit> =
-        Result.failure(UnsupportedOperationException("GeckoView requires WebExtension"))
+    override suspend fun postMessageToJs(channel: String, data: String): Result<Unit> = withContext(Dispatchers.Main) {
+        if (messagingPorts.isEmpty()) {
+            return@withContext Result.failure(IllegalStateException("Messaging extension not ready; no ports connected"))
+        }
+        val payload = JSONObject().apply {
+            put("action", "postMessage")
+            put("channel", channel)
+            put("data", data)
+        }
+        try {
+            messagingPorts.forEach { it.postMessage(payload) }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
     // MessagingBridgeCapable
     override val bridgeName: String get() = "browser"
@@ -442,21 +465,13 @@ class GeckoEngine(
     override suspend fun clearCookies() = withContext(Dispatchers.Main) {
         suspendCancellableCoroutine<Unit> { cont ->
             runtime.storageController.clearData(StorageController.ClearFlags.COOKIES)
-                .then(
-                    { cont.resume(Unit) },
-                    { cont.resumeWith(Result.failure(it)) }
-                )
         }
     }
 
     override suspend fun clearCookiesFor(url: String) = withContext(Dispatchers.Main) {
         val host = try { java.net.URL(url).host } catch (_: Exception) { return@withContext }
-        suspendCancellableCoroutine<Unit> { cont ->
+        suspendCancellableCoroutine { _ ->
             runtime.storageController.clearDataFromHost(host, StorageController.ClearFlags.COOKIES)
-                .then(
-                    { cont.resume(Unit) },
-                    { cont.resumeWith(Result.failure(it)) }
-                )
         }
     }
 

@@ -47,7 +47,7 @@ fun BrowserScreen(
     val logs by viewModel.bridgeLogs.collectAsState()
 
     DisposableEffect(Unit) {
-        engine.loadUrl("https://robinhood.com/login")
+        engine.loadUrl(Script.robinhoodULR)
         onDispose { /* ViewModel calls engine.destroy() in onCleared */ }
     }
 
@@ -60,6 +60,12 @@ fun BrowserScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Start Injection")
+            }
+            Button(
+                onClick = { viewModel.sendExampleMessage() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Send Example")
             }
             if (state.isLoading) {
                 LinearProgressIndicator(

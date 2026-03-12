@@ -47,6 +47,20 @@ class BrowserViewModel @Inject constructor(
         }
     }
 
+    fun sendExampleMessage() {
+        val js = engine.capability(JsCapable::class) ?: return
+        val exampleData = """{"message":"Hello from Android","timestamp":${System.currentTimeMillis()}}"""
+        viewModelScope.launch {
+            js.postMessageToJs("example", exampleData)
+                .onSuccess {
+                    Log.d(LOG_TAG, "postMessageToJs sent: channel=example, data=$exampleData")
+                }
+                .onFailure { e ->
+                    Log.e(LOG_TAG, "postMessageToJs failed: ${e.message}")
+                }
+        }
+    }
+
     override fun onCleared() {
         engine.destroy()
         super.onCleared()

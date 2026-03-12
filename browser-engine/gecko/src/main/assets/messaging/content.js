@@ -26,6 +26,10 @@ try {
       injectScriptIntoPage(msg.script);
       return;
     }
+    if (msg && msg.action === "postMessage" && msg.channel != null) {
+      window.postMessage({ type: "FROM_ANDROID", channel: msg.channel, data: msg.data ?? msg.text ?? "" }, "*");
+      return;
+    }
     const text = (msg && (msg.text || msg.data || msg.reply)) || JSON.stringify(msg);
     window.postMessage({ type: "FROM_ANDROID", text }, "*");
   });
