@@ -9,6 +9,9 @@ pluginManagement {
         }
         mavenCentral()
         gradlePluginPortal()
+        maven {
+            url = uri("https://maven.mozilla.org/maven2/")
+        }
     }
 }
 plugins {
@@ -19,6 +22,9 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven {
+            url = uri("https://maven.mozilla.org/maven2/")
+        }
     }
 }
 
@@ -27,4 +33,6 @@ include(":app")
 include(":browser-engine:core")
 include(":browser-engine:webview")
 include(":browser-engine:factory")
+include(":browser-engine:gecko")
+include(":browser-engine:decorators")
  

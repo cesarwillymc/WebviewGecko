@@ -1,0 +1,8 @@
+com.browserengine.decorators-pngs-0 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/decorators/build/generated/res/pngs/debug
+com.browserengine.decorators-updated_navigation_xml-1 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/decorators/build/generated/updated_navigation_xml/debug
+com.browserengine.decorators-mergeDebugResources-2 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/decorators/build/intermediates/incremental/debug/mergeDebugResources/merged.dir
+com.browserengine.decorators-mergeDebugResources-3 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/decorators/build/intermediates/incremental/debug/mergeDebugResources/stripped.dir
+com.browserengine.decorators-debug-4 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/decorators/build/intermediates/merged_res/debug/mergeDebugResources
+com.browserengine.decorators-debug-5 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/decorators/build/intermediates/packaged_res/debug/packageDebugResources
+com.browserengine.decorators-debug-6 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/decorators/src/debug/res
+com.browserengine.decorators-main-7 /Users/cesarwillymc/AndroidStudioProjects/WebviewGecko/browser-engine/decorators/src/main/res

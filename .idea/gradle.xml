@@ -9,6 +9,12 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
+            <option value="$PROJECT_DIR$/browser-engine" />
+            <option value="$PROJECT_DIR$/browser-engine/core" />
+            <option value="$PROJECT_DIR$/browser-engine/decorators" />
+            <option value="$PROJECT_DIR$/browser-engine/factory" />
+            <option value="$PROJECT_DIR$/browser-engine/gecko" />
+            <option value="$PROJECT_DIR$/browser-engine/webview" />
           </set>
         </option>
       </GradleProjectSettings>

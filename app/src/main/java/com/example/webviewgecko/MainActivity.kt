@@ -15,16 +15,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
-import com.browserengine.core.BrowserConfig
-import com.browserengine.core.EngineType
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.browserengine.core.capabilities.UICapable
-import com.browserengine.factory.BrowserEngineFactory
 import com.example.webviewgecko.ui.theme.WebviewGeckoTheme
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,23 +36,14 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun BrowserScreen() {
-    val context = LocalContext.current
-    val engine = remember(context) {
-        BrowserEngineFactory.create(
-            context = context,
-            type = EngineType.WEBVIEW,
-            config = BrowserConfig(
-                javaScriptEnabled = true,
-                domStorageEnabled = true,
-                supportMultipleWindows = true
-            )
-        )
-    }
+fun BrowserScreen(
+    viewModel: BrowserViewModel = hiltViewModel()
+) {
+    val engine = viewModel.engine
 
     DisposableEffect(Unit) {
-        engine.loadUrl("https://example.com")
-        onDispose { engine.destroy() }
+        engine.loadUrl("https://ndcdyn.interactivebrokers.com/sso/Login?RL=1&menu=A&locale=en_US")
+        onDispose { /* ViewModel calls engine.destroy() in onCleared */ }
     }
 
     val state by engine.state.collectAsState()
@@ -67,9 +56,9 @@ fun BrowserScreen() {
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-            engine.capability<UICapable>()
+            engine.capability(UICapable::class)
                 ?.RenderUI(Modifier.fillMaxSize().weight(1f))
-                ?: Text("Engine has no UI")
+                ?: Text(text = "Engine has no UI")
         }
     }
 }

@@ -212,15 +212,16 @@ PHASE 3 — GeckoView Implementation (Week 5-7)
  ☐ GeckoPdfCapable → saveAsPdf
  ☐ GeckoNavigationCapable → session navigation
  ☐ GeckoNetworkCapable → ContentDelegate + RuntimeSettings
- ☐ GeckoPopupCapable → ContentDelegate.onOpenWindow + new session
- ☐ GeckoNavigationInterceptCapable → NavigationDelegate.onLoadRequest
+ ☑ GeckoPopupCapable → NavigationDelegate.onNewSession
+ ☑ GeckoNavigationInterceptCapable → NavigationDelegate.onLoadRequest
+ ☐ Full screenshot/savePage (GeckoView API varies by version)
  ☐ Integration tests
 
 PHASE 4 — Decorators (Week 8)
 ══════════════════════════════
- ☐ LoggingBrowserDecorator → logs all events and calls
- ☐ AnalyticsBrowserDecorator → emits analytics events
- ☐ SecurityBrowserDecorator → enforces URL whitelist/blacklist
+ ☑ LoggingBrowserDecorator → logs all events and calls
+ ☑ AnalyticsBrowserDecorator → emits analytics events
+ ☑ SecurityBrowserDecorator → enforces URL whitelist/blacklist
  ☐ CachingBrowserDecorator → smart cache strategies
 
 PHASE 5 — Factory + DI (Week 9)
