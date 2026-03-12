@@ -8,7 +8,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,6 +44,7 @@ fun BrowserScreen(
     viewModel: BrowserViewModel = hiltViewModel()
 ) {
     val engine = viewModel.engine
+    val logs by viewModel.bridgeLogs.collectAsState()
 
     DisposableEffect(Unit) {
         engine.loadUrl("https://ndcdyn.interactivebrokers.com/sso/Login?RL=1&menu=A&locale=en_US")
@@ -50,6 +55,12 @@ fun BrowserScreen(
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+            Button(
+                onClick = { viewModel.startInjection() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Start Injection")
+            }
             if (state.isLoading) {
                 LinearProgressIndicator(
                     progress = state.progress,
@@ -59,6 +70,7 @@ fun BrowserScreen(
             engine.capability(UICapable::class)
                 ?.RenderUI(Modifier.fillMaxSize().weight(1f))
                 ?: Text(text = "Engine has no UI")
+
         }
     }
 }
