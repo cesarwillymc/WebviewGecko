@@ -346,8 +346,21 @@ class GeckoEngine(
         )
     }
 
-    override suspend fun evaluateScript(script: String): Result<String> =
-        Result.failure(UnsupportedOperationException("GeckoView requires WebExtension for JS injection"))
+    override suspend fun evaluateScript(script: String): Result<String> = withContext(Dispatchers.Main) {
+        if (messagingPorts.isEmpty()) {
+            return@withContext Result.failure(IllegalStateException("Messaging extension not ready; no ports connected"))
+        }
+        val payload = JSONObject().apply {
+            put("action", "evaluate")
+            put("script", script)
+        }
+        try {
+            messagingPorts.forEach { it.postMessage(payload) }
+            Result.success("")
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
     override suspend fun injectScriptFromAssets(assetPath: String): Result<Unit> =
         Result.failure(UnsupportedOperationException("GeckoView requires WebExtension for script injection"))

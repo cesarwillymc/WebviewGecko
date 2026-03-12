@@ -4,9 +4,28 @@
 
 let port = null;
 
+function injectScriptIntoPage(script) {
+  const androidPolyfill = `
+    if (typeof window.Android === 'undefined') {
+      window.Android = {
+        onError: function(m) { window.postMessage({ type: "FROM_PAGE", method: "onError", message: m }, "*"); },
+        onReadJson: function(m) { window.postMessage({ type: "FROM_PAGE", method: "onReadJson", message: m }, "*"); }
+      };
+    }
+  `;
+  const el = document.createElement("script");
+  el.textContent = androidPolyfill + "\n" + script;
+  (document.head || document.documentElement).appendChild(el);
+  el.remove();
+}
+
 try {
   port = browser.runtime.connectNative("browser");
   port.onMessage.addListener((msg) => {
+    if (msg && msg.action === "evaluate" && typeof msg.script === "string") {
+      injectScriptIntoPage(msg.script);
+      return;
+    }
     const text = (msg && (msg.text || msg.data || msg.reply)) || JSON.stringify(msg);
     window.postMessage({ type: "FROM_ANDROID", text }, "*");
   });

@@ -47,7 +47,7 @@ fun BrowserScreen(
     val logs by viewModel.bridgeLogs.collectAsState()
 
     DisposableEffect(Unit) {
-        engine.loadUrl("https://ndcdyn.interactivebrokers.com/sso/Login?RL=1&menu=A&locale=en_US")
+        engine.loadUrl("https://robinhood.com/login")
         onDispose { /* ViewModel calls engine.destroy() in onCleared */ }
     }
 

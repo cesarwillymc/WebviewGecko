@@ -37,7 +37,7 @@ class BrowserViewModel @Inject constructor(
         bridge.setOnReadJsonHandler { msg -> log("onReadJson", msg) }
 
         viewModelScope.launch {
-            js.evaluateScript(Script.ibkr)
+            js.evaluateScript(Script.robinhood)
                 .onSuccess {
                     log("inject", "Script.ibkr injected successfully")
                 }

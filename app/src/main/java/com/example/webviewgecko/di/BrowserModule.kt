@@ -24,7 +24,7 @@ object BrowserModule {
     ): BrowserEngine {
         return BrowserEngineFactory.create(
             context = context,
-            type = EngineType.GECKO,
+            type = EngineType.WEBVIEW,
             config = BrowserConfig(
                 javaScriptEnabled = true,
                 domStorageEnabled = true,
