@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
+import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -246,6 +247,21 @@ class WebViewEngine(
                 }
             }
             popupEngine?.let { popupCloseHandler?.onPopupCloseRequested(it) }
+        }
+
+        override fun onPermissionRequest(request: PermissionRequest?) {
+            if (request == null) return
+            val resources = request.resources
+            if (resources.isNullOrEmpty()) {
+                request.deny()
+                return
+            }
+            val permissions = resources.toList()
+            onPermissionRequested(
+                permissions = permissions,
+                onGrant = { request.grant(resources) },
+                onDeny = { request.deny() }
+            )
         }
     }
 

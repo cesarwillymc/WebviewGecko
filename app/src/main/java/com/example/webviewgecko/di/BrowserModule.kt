@@ -22,6 +22,7 @@ object BrowserModule {
     fun provideBrowserEngine(
         @ApplicationContext context: Context
     ): BrowserEngine {
+       
         return BrowserEngineFactory.create(
             context = context,
             type = EngineType.GECKO,

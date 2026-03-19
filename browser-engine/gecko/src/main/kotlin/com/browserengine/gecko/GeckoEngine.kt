@@ -313,19 +313,73 @@ class GeckoEngine(
         }
     }
 
+    private fun permissionTypeToString(type: Int): String = when (type) {
+        GeckoSession.PermissionDelegate.PERMISSION_GEOLOCATION -> "geolocation"
+        GeckoSession.PermissionDelegate.PERMISSION_DESKTOP_NOTIFICATION -> "notification"
+        GeckoSession.PermissionDelegate.PERMISSION_PERSISTENT_STORAGE -> "persistent_storage"
+        GeckoSession.PermissionDelegate.PERMISSION_XR -> "xr"
+        GeckoSession.PermissionDelegate.PERMISSION_AUTOPLAY_INAUDIBLE -> "autoplay_inaudible"
+        GeckoSession.PermissionDelegate.PERMISSION_AUTOPLAY_AUDIBLE -> "autoplay_audible"
+        GeckoSession.PermissionDelegate.PERMISSION_MEDIA_KEY_SYSTEM_ACCESS -> "media_key_system"
+        GeckoSession.PermissionDelegate.PERMISSION_TRACKING -> "tracking"
+        GeckoSession.PermissionDelegate.PERMISSION_STORAGE_ACCESS -> "storage_access"
+        GeckoSession.PermissionDelegate.PERMISSION_LOCAL_DEVICE_ACCESS -> "local_device"
+        GeckoSession.PermissionDelegate.PERMISSION_LOCAL_NETWORK_ACCESS -> "local_network"
+        else -> "permission_$type"
+    }
+
     private fun createPermissionDelegate() = object : GeckoSession.PermissionDelegate {
         override fun onAndroidPermissionsRequest(
             session: GeckoSession,
             permissions: Array<out String>?,
             callback: GeckoSession.PermissionDelegate.Callback
         ) {
-            Log.e(
-                "createPermissionDelegate",
-                "onAndroidPermissionsRequest frommm android requesttt: ${permissions}"
-            )
+            Log.d("GeckoEngine", "onAndroidPermissionsRequest: ${permissions?.toList()}")
             permissionRequestHandler?.invoke(
                 permissions.orEmpty().toList(),
                 { callback.grant() },
+                { callback.reject() }
+            ) ?: callback.reject()
+        }
+
+        override fun onContentPermissionRequest(
+            session: GeckoSession,
+            perm: GeckoSession.PermissionDelegate.ContentPermission
+        ): GeckoResult<Int> {
+            val result = GeckoResult<Int>()
+            val permissionName = permissionTypeToString(perm.permission)
+            Log.d("GeckoEngine", "onContentPermissionRequest: $permissionName (${perm.uri})")
+            permissionRequestHandler?.invoke(
+                listOf(permissionName),
+                { result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW) },
+                { result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY) }
+            ) ?: result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY)
+            return result
+        }
+
+        override fun onMediaPermissionRequest(
+            session: GeckoSession,
+            uri: String,
+            video: Array<out GeckoSession.PermissionDelegate.MediaSource>?,
+            audio: Array<out GeckoSession.PermissionDelegate.MediaSource>?,
+            callback: GeckoSession.PermissionDelegate.MediaCallback
+        ) {
+            val permissions = mutableListOf<String>()
+            if (!video.isNullOrEmpty()) permissions.add("video")
+            if (!audio.isNullOrEmpty()) permissions.add("audio")
+            if (permissions.isEmpty()) {
+                callback.reject()
+                return
+            }
+            Log.d("GeckoEngine", "onMediaPermissionRequest: $permissions ($uri)")
+            permissionRequestHandler?.invoke(
+                permissions,
+                {
+                    callback.grant(
+                        video?.firstOrNull(),
+                        audio?.firstOrNull()
+                    )
+                },
                 { callback.reject() }
             ) ?: callback.reject()
         }
