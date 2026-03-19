@@ -50,17 +50,18 @@ fun BrowserScreen(
     viewModel: BrowserViewModel = hiltViewModel()
 ) {
     val engine = viewModel.engine
-    val logs by viewModel.bridgeLogs.collectAsState()
-    val pendingPermission by viewModel.pendingPermissionRequest.collectAsState()
-    val context = LocalContext.current
-    val activity = context as? ComponentActivity
-    val state by engine.state.collectAsState()
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
         val allGranted = results.values.all { it }
         viewModel.completePermissionGrant(allGranted)
     }
+
+    val logs by viewModel.bridgeLogs.collectAsState()
+    val pendingPermission by viewModel.pendingPermissionRequest.collectAsState()
+    val context = LocalContext.current
+    val activity = context as? ComponentActivity
+    val state by engine.state.collectAsState()
 
     DisposableEffect(Unit) {
         engine.loadUrl(Script.robinhoodULR)

@@ -1,5 +1,12 @@
 package com.browserengine.core
 
+import android.util.Log
+import com.browserengine.core.capabilities.JsCapable
+import com.browserengine.core.capabilities.MessagingBridgeCapable
+import com.browserengine.core.capabilities.NavigationCapable
+import com.browserengine.core.capabilities.NavigationInterceptCapable
+import com.browserengine.core.capabilities.NavigationInterceptor
+import com.browserengine.core.capabilities.PermissionCapable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.reflect.KClass
@@ -20,8 +27,99 @@ interface BrowserEngine {
 
     /** Capability discovery (type-safe) */
     fun <T : BrowserCapability> capability(type: KClass<T>): T?
+
+    suspend fun goBack() {
+        capability(NavigationCapable::class)?.goBack()
+            ?: logMissingCapability("goBack", NavigationCapable::class)
+    }
+
+    suspend fun goForward() {
+        capability(NavigationCapable::class)?.goForward()
+            ?: logMissingCapability("goForward", NavigationCapable::class)
+    }
+
+    suspend fun goTo(historyIndex: Int) {
+        capability(NavigationCapable::class)?.goTo(historyIndex)
+            ?: logMissingCapability("goTo", NavigationCapable::class)
+    }
+
+    suspend fun injectScript(script: String): Result<String> =
+        capability(JsCapable::class)?.evaluateScript(script)
+            ?: missingCapabilityResult("injectScript", JsCapable::class)
+
+    suspend fun injectScriptFromAssets(assetPath: String): Result<Unit> =
+        capability(JsCapable::class)?.injectScriptFromAssets(assetPath)
+            ?: missingCapabilityResult("injectScriptFromAssets", JsCapable::class)
+
+    suspend fun postMessageToJs(channel: String, data: String): Result<Unit> =
+        capability(JsCapable::class)?.postMessageToJs(channel, data)
+            ?: missingCapabilityResult("postMessageToJs", JsCapable::class)
+
+    fun postMessage(message: String) {
+        capability(MessagingBridgeCapable::class)?.postMessage(message)
+            ?: logMissingCapability("postMessage", MessagingBridgeCapable::class)
+    }
+
+    fun setOnErrorHandler(handler: ((String) -> Unit)?) {
+        capability(MessagingBridgeCapable::class)?.setOnErrorHandler(handler)
+            ?: logMissingCapability("setOnErrorHandler", MessagingBridgeCapable::class)
+    }
+
+    fun setOnReadJsonHandler(handler: ((String) -> Unit)?) {
+        capability(MessagingBridgeCapable::class)?.setOnReadJsonHandler(handler)
+            ?: logMissingCapability("setOnReadJsonHandler", MessagingBridgeCapable::class)
+    }
+
+    fun addMessageListener(listener: MessagingBridgeCapable.MessageListener) {
+        capability(MessagingBridgeCapable::class)?.addMessageListener(listener)
+            ?: logMissingCapability("addMessageListener", MessagingBridgeCapable::class)
+    }
+
+    fun removeMessageListener(listener: MessagingBridgeCapable.MessageListener) {
+        capability(MessagingBridgeCapable::class)?.removeMessageListener(listener)
+            ?: logMissingCapability("removeMessageListener", MessagingBridgeCapable::class)
+    }
+
+    fun setPermissionRequestHandler(handler: ((List<String>, () -> Unit, () -> Unit) -> Unit)?) {
+        capability(PermissionCapable::class)?.setPermissionRequestHandler(handler)
+            ?: logMissingCapability("setPermissionRequestHandler", PermissionCapable::class)
+    }
+
+    fun setNavigationInterceptor(interceptor: NavigationInterceptor?) {
+        capability(NavigationInterceptCapable::class)?.setNavigationInterceptor(interceptor)
+            ?: logMissingCapability("setNavigationInterceptor", NavigationInterceptCapable::class)
+    }
+
+    fun getNavigationInterceptor(): NavigationInterceptor? =
+        capability(NavigationInterceptCapable::class)?.getNavigationInterceptor().also {
+            if (it == null && capability(NavigationInterceptCapable::class) == null) {
+                logMissingCapability("getNavigationInterceptor", NavigationInterceptCapable::class)
+            }
+        }
 }
 
 /** Convenience inline extension */
 inline fun <reified T : BrowserCapability> BrowserEngine.capability(): T? =
     capability(T::class)
+
+private const val BROWSER_ENGINE_LOG_TAG = "BrowserEngine"
+
+private fun BrowserEngine.logMissingCapability(
+    action: String,
+    capability: KClass<out BrowserCapability>
+) {
+    Log.w(
+        BROWSER_ENGINE_LOG_TAG,
+        "$action skipped because ${capability.simpleName} is not enabled for this engine"
+    )
+}
+
+private fun <T> BrowserEngine.missingCapabilityResult(
+    action: String,
+    capability: KClass<out BrowserCapability>
+): Result<T> {
+    logMissingCapability(action, capability)
+    return Result.failure(
+        IllegalStateException("$action requires ${capability.simpleName}")
+    )
+}
