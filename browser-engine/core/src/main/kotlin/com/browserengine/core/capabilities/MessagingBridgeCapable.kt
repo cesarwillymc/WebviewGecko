@@ -60,10 +60,4 @@ interface MessagingBridgeCapable : BrowserCapability {
      * @param message The string to send. Caller is responsible for escaping if needed.
      */
     fun postMessage(message: String)
-
-    /**
-     * Sends a message and optionally receives a response (GeckoView: via MessageDelegate return;
-     * WebView: not supported, returns null).
-     */
-    suspend fun sendMessageAndReceive(message: String): String? = null
 }

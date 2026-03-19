@@ -16,6 +16,7 @@ import com.browserengine.decorators.SecurityMode
 import com.browserengine.gecko.GeckoEngine
 import com.browserengine.gecko.GeckoCapabilityInstallers
 import com.browserengine.webview.WebViewEngine
+import com.browserengine.webview.WebViewCapabilityInstallers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.reflect.KClass
@@ -99,10 +100,10 @@ object BrowserEngineFactory {
         config: BrowserConfig
     ): BrowserEngine {
         return when (type) {
-            EngineType.WEBVIEW -> WebViewEngine(
-                context = context,
-                config = config
-            )
+            EngineType.WEBVIEW -> WebViewEngine.Builder(context)
+                .settings(config)
+                .addDefaultCapabilities()
+                .build()
             EngineType.GECKO -> GeckoEngine.Builder(context)
                 .settings(config)
                 .addDefaultCapabilities()
