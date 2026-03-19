@@ -39,7 +39,6 @@ fun permissionStringsToAndroidManifest(permissions: List<String>): List<String> 
 class BrowserViewModel @Inject constructor(
     private val engineProvider: BrowserEngineProvider,
     private val permissionCoordinator: BrowserPermissionCoordinator,
-    private val featureManager: BrowserFeatureOnDemandManager
 ) : ViewModel() {
     private val _engine = MutableStateFlow<BrowserEngine?>(null)
     val engine: StateFlow<BrowserEngine?> = _engine.asStateFlow()
@@ -49,19 +48,14 @@ class BrowserViewModel @Inject constructor(
 
     val pendingPermissionRequest: StateFlow<BrowserPermissionCoordinator.PendingPermissionRequest?> =
         permissionCoordinator.pendingPermissionRequest
-    val featureSheetState: StateFlow<BrowserFeatureSheetState> = featureManager.sheetState
 
-    init {
-    }
 
     fun ensureEngine(type: EngineType, context: Context) {
         if (_engine.value != null) return
 
         viewModelScope.launch {
             runCatching {
-                featureManager.downloadAndShowModal(type) {
-                    _engine.value = engineProvider.build(context, type)
-                }
+                _engine.value = engineProvider.build(context, type)
             }.onFailure { error ->
                 Log.e(LOG_TAG, "Failed to build engine", error)
             }

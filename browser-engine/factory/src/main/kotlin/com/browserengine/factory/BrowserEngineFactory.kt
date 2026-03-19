@@ -13,6 +13,7 @@ import com.browserengine.decorators.AnalyticsCallback
 import com.browserengine.decorators.LoggingBrowserDecorator
 import com.browserengine.decorators.SecurityBrowserDecorator
 import com.browserengine.decorators.SecurityMode
+import com.browserengine.gecko.GeckoEngine
 import com.browserengine.webview.WebViewEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +22,12 @@ import kotlin.reflect.KClass
 private val defaultEngineCreators = mapOf<EngineType, EngineCreator>(
     EngineType.WEBVIEW to EngineCreator { context, config ->
         WebViewEngine.Builder(context)
+            .settings(config)
+            .addDefaultCapabilities()
+            .build()
+    },
+    EngineType.GECKO to EngineCreator { context, config ->
+        GeckoEngine.Builder(context)
             .settings(config)
             .addDefaultCapabilities()
             .build()
@@ -58,9 +65,6 @@ object BrowserEngineFactory {
             this.decoratorOptions = options
         }
 
-        fun featureValidator(validator: EngineFeatureValidator): Builder = apply {
-            this.featureValidator = validator
-        }
 
         fun addCapability(capability: BrowserEngineCapability): Builder = apply {
             capabilities += capability

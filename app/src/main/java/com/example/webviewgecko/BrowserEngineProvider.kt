@@ -17,21 +17,12 @@ import javax.inject.Singleton
 @Singleton
 class BrowserEngineProvider @Inject constructor(
     private val permissionCoordinator: BrowserPermissionCoordinator,
-    private val featureManager: BrowserFeatureOnDemandManager
 ) {
     fun build(context: Context, type: EngineType): BrowserEngine {
         return BrowserEngineFactory.Builder(
             context = context,
             type = type
         )
-            .featureValidator { engineType ->
-                val (isValid, reason) = featureManager.buildValidation(engineType)
-                if (isValid) {
-                    EngineFeatureValidation.valid()
-                } else {
-                    EngineFeatureValidation.invalid(reason ?: "Feature unavailable")
-                }
-            }
             .settings(
                 BrowserConfig(
                     javaScriptEnabled = true,

@@ -1,4 +1,3 @@
 <resources>
     <string name="app_name">Webview+Gecko</string>
-    <string name="feature_gecko_title">Gecko Engine</string>
 </resources>

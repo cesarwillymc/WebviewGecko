@@ -35,6 +35,4 @@ include(":browser-engine:webview")
 include(":browser-engine:factory")
 include(":browser-engine:gecko")
 include(":browser-engine:decorators")
-include(":feature_gecko")
-project(":feature_gecko").projectDir = file("feature-gecko")
  

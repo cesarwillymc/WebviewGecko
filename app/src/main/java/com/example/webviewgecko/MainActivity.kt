@@ -62,7 +62,6 @@ fun BrowserScreen(
     }
 
     val pendingPermission by viewModel.pendingPermissionRequest.collectAsState()
-    val featureSheetState by viewModel.featureSheetState.collectAsState()
     val context = LocalContext.current
     val activity = context as? ComponentActivity
     val fallbackState = remember { MutableStateFlow(BrowserState()) }
@@ -121,37 +120,7 @@ fun BrowserScreen(
         }
     }
 
-    if (featureSheetState.isVisible) {
-        BrowserFeatureDownloadSheet(featureSheetState)
-    }
 }
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun BrowserFeatureDownloadSheet(
-    state: BrowserFeatureSheetState
-) {
-    ModalBottomSheet(
-        onDismissRequest = { }
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.Start
-        ) {
-            Text(text = state.title)
-            Text(
-                text = state.description,
-                modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
-            )
-            if (state.isDownloading) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-        }
-    }
-}
-
 @Composable
 private fun EngineLoadingState() {
     Column(

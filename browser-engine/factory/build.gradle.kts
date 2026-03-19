@@ -23,6 +23,7 @@ android {
 dependencies {
     implementation(project(":browser-engine:core"))
     implementation(project(":browser-engine:webview"))
+    implementation(project(":browser-engine:gecko"))
     implementation(project(":browser-engine:decorators"))
     implementation(libs.androidx.core.ktx)
 }

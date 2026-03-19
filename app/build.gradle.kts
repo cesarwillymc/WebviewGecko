@@ -8,7 +8,6 @@ plugins {
 
 android {
     namespace = "com.example.webviewgecko"
-    dynamicFeatures += setOf(":feature_gecko")
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -62,8 +61,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.play.feature.delivery)
-    implementation(libs.play.feature.delivery.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
