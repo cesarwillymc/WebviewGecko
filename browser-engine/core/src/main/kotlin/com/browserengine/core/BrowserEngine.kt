@@ -1,14 +1,18 @@
 package com.browserengine.core
 
 import android.util.Log
+import com.browserengine.core.capabilities.ArchiveCapable
+import com.browserengine.core.capabilities.ArchiveFormat
 import com.browserengine.core.capabilities.JsCapable
 import com.browserengine.core.capabilities.MessagingBridgeCapable
 import com.browserengine.core.capabilities.NavigationCapable
 import com.browserengine.core.capabilities.NavigationInterceptCapable
 import com.browserengine.core.capabilities.NavigationInterceptor
 import com.browserengine.core.capabilities.PermissionCapable
+import com.browserengine.core.capabilities.TemporaryStorageCapable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import java.io.File
 import kotlin.reflect.KClass
 
 /**
@@ -96,6 +100,34 @@ interface BrowserEngine {
                 logMissingCapability("getNavigationInterceptor", NavigationInterceptCapable::class)
             }
         }
+
+    suspend fun saveCurrentWebsite(
+        directory: File,
+        baseName: String? = null
+    ): Result<SavedPage> {
+        val archive = capability(ArchiveCapable::class)
+            ?: return missingCapabilityResult("saveCurrentWebsite", ArchiveCapable::class)
+
+        if (!directory.exists()) {
+            directory.mkdirs()
+        }
+
+        val format = archive.preferredFormat()
+        val file = File(directory, "${resolveBaseName(baseName)}.${format.extension}")
+        return archive.savePage(file, format).map { SavedPage(file = file, format = format) }
+    }
+
+    suspend fun saveCurrentWebsite(
+        baseName: String? = null
+    ): Result<SavedPage> {
+        val temporaryStorage = capability(TemporaryStorageCapable::class)
+            ?: return missingCapabilityResult("saveCurrentWebsite", TemporaryStorageCapable::class)
+
+        return saveCurrentWebsite(
+            directory = temporaryStorage.temporaryDirectory(),
+            baseName = baseName
+        )
+    }
 }
 
 /** Convenience inline extension */
@@ -122,4 +154,37 @@ private fun <T> BrowserEngine.missingCapabilityResult(
     return Result.failure(
         IllegalStateException("$action requires ${capability.simpleName}")
     )
+}
+
+data class SavedPage(
+    val file: File,
+    val format: ArchiveFormat
+)
+
+private fun ArchiveCapable.preferredFormat(): ArchiveFormat =
+    when {
+        ArchiveFormat.PDF in supportedFormats -> ArchiveFormat.PDF
+        ArchiveFormat.MHTML in supportedFormats -> ArchiveFormat.MHTML
+        ArchiveFormat.HTML in supportedFormats -> ArchiveFormat.HTML
+        else -> supportedFormats.first()
+    }
+
+private val ArchiveFormat.extension: String
+    get() = when (this) {
+        ArchiveFormat.PDF -> "pdf"
+        ArchiveFormat.MHTML -> "mhtml"
+        ArchiveFormat.HTML -> "html"
+    }
+
+private fun BrowserEngine.resolveBaseName(baseName: String?): String {
+    val candidate = baseName
+        ?: state.value.title.takeIf { it.isNotBlank() }
+        ?: state.value.url.substringAfter("://").substringBefore("/").takeIf { it.isNotBlank() }
+        ?: "page"
+
+    return candidate
+        .trim()
+        .replace(Regex("[^A-Za-z0-9._-]+"), "_")
+        .trim('_')
+        .ifBlank { "page" }
 }

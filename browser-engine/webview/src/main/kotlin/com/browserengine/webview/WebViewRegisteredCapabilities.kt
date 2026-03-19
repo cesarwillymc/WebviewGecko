@@ -35,6 +35,7 @@ import com.browserengine.core.capabilities.PopupRequestHandler
 import com.browserengine.core.capabilities.RequestInterceptor
 import com.browserengine.core.capabilities.ScreenshotCapable
 import com.browserengine.core.capabilities.StorageCapable
+import com.browserengine.core.capabilities.TemporaryStorageCapable
 import com.browserengine.core.capabilities.UICapable
 import com.browserengine.core.capabilities.UrlFilter
 import kotlinx.coroutines.Dispatchers
@@ -189,6 +190,14 @@ internal class WebViewStorageCapability(
 
     override fun setDomStorageEnabled(enabled: Boolean) {
         webView.settings.domStorageEnabled = enabled
+    }
+}
+
+internal class WebViewTemporaryStorageCapability(
+    private val cacheDirectory: File
+) : TemporaryStorageCapable {
+    override fun temporaryDirectory(): File = File(cacheDirectory, "browser-engine").apply {
+        mkdirs()
     }
 }
 

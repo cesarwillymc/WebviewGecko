@@ -16,6 +16,7 @@ import com.browserengine.core.capabilities.PermissionCapable
 import com.browserengine.core.capabilities.PopupCapable
 import com.browserengine.core.capabilities.ScreenshotCapable
 import com.browserengine.core.capabilities.StorageCapable
+import com.browserengine.core.capabilities.TemporaryStorageCapable
 import com.browserengine.core.capabilities.UICapable
 
 fun interface GeckoCapabilityInstaller {
@@ -38,6 +39,7 @@ object GeckoCapabilityInstallers {
         permissions(),
         cookies(),
         storage(),
+        temporaryStorage(),
         screenshot(),
         archive(),
         navigation(),
@@ -70,12 +72,16 @@ object GeckoCapabilityInstallers {
         GeckoStorageCapability(scope.components.runtime, scope.components.session)
     }
 
+    fun temporaryStorage(): GeckoCapabilityInstaller = register(TemporaryStorageCapable::class) { scope ->
+        GeckoTemporaryStorageCapability(scope.components.cacheDirectory)
+    }
+
     fun screenshot(): GeckoCapabilityInstaller = register(ScreenshotCapable::class) {
         GeckoScreenshotCapability()
     }
 
     fun archive(): GeckoCapabilityInstaller = register(ArchiveCapable::class) {
-        GeckoArchiveCapability()
+        GeckoArchiveCapability(it.components.session)
     }
 
     fun navigation(): GeckoCapabilityInstaller = register(NavigationCapable::class) { scope ->
@@ -83,7 +89,7 @@ object GeckoCapabilityInstallers {
     }
 
     fun network(): GeckoCapabilityInstaller = register(NetworkCapable::class) { scope ->
-        GeckoNetworkCapability(scope.components.runtime, scope.config, scope.delegates)
+        GeckoNetworkCapability(scope.components.runtime, scope.config)
     }
 
     fun media(): GeckoCapabilityInstaller = register(MediaCapable::class) {

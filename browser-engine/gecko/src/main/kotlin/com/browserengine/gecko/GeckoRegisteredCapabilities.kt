@@ -29,16 +29,19 @@ import com.browserengine.core.capabilities.PopupRequestHandler
 import com.browserengine.core.capabilities.RequestInterceptor
 import com.browserengine.core.capabilities.ScreenshotCapable
 import com.browserengine.core.capabilities.StorageCapable
+import com.browserengine.core.capabilities.TemporaryStorageCapable
 import com.browserengine.core.capabilities.UICapable
 import com.browserengine.core.capabilities.UrlFilter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.StorageController
 import java.io.File
+import java.io.InputStream
 import kotlin.coroutines.resume
 
 internal class GeckoUiCapability(
@@ -165,6 +168,14 @@ internal class GeckoStorageCapability(
     override fun setDomStorageEnabled(enabled: Boolean) = Unit
 }
 
+internal class GeckoTemporaryStorageCapability(
+    private val cacheDirectory: File
+) : TemporaryStorageCapable {
+    override fun temporaryDirectory(): File = File(cacheDirectory, "browser-engine").apply {
+        mkdirs()
+    }
+}
+
 internal class GeckoScreenshotCapability : ScreenshotCapable {
     override suspend fun captureScreenshot(): Result<android.graphics.Bitmap> =
         Result.failure(UnsupportedOperationException("GeckoView capturePixels is not implemented in this project yet"))
@@ -173,11 +184,29 @@ internal class GeckoScreenshotCapability : ScreenshotCapable {
         Result.failure(UnsupportedOperationException("GeckoView screenshot saving is not implemented in this project yet"))
 }
 
-internal class GeckoArchiveCapability : ArchiveCapable {
-    override val supportedFormats: List<ArchiveFormat> = listOf(ArchiveFormat.PDF, ArchiveFormat.HTML)
+internal class GeckoArchiveCapability(
+    private val session: GeckoSession
+) : ArchiveCapable {
+    override val supportedFormats: List<ArchiveFormat> = listOf(ArchiveFormat.PDF)
 
-    override suspend fun savePage(destination: File, format: ArchiveFormat): Result<Unit> =
-        Result.failure(UnsupportedOperationException("GeckoView page export is not implemented for this version yet"))
+    override suspend fun savePage(destination: File, format: ArchiveFormat): Result<Unit> = withContext(Dispatchers.Main) {
+        when (format) {
+            ArchiveFormat.PDF -> runCatching {
+                destination.parentFile?.mkdirs()
+                val inputStream = session.saveAsPdf().await()
+                inputStream.use { input ->
+                    destination.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                Unit
+            }
+            ArchiveFormat.MHTML,
+            ArchiveFormat.HTML -> Result.failure(
+                UnsupportedOperationException("GeckoView export supports PDF only in this project")
+            )
+        }
+    }
 }
 
 internal class GeckoNavigationCapability(
@@ -202,7 +231,6 @@ internal class GeckoNavigationCapability(
 internal class GeckoNetworkCapability(
     private val runtime: GeckoRuntime,
     config: com.browserengine.core.BrowserConfig,
-    private val delegates: GeckoDelegateHub
 ) : NetworkCapable {
     var defaultHeaders: Map<String, String> = emptyMap()
         private set
@@ -231,6 +259,20 @@ internal class GeckoNetworkCapability(
 
     override fun setMixedContentMode(mode: MixedContentMode) = Unit
 }
+
+private suspend fun <T> GeckoResult<T>.await(): T =
+    suspendCancellableCoroutine { cont ->
+        accept(
+            { value ->
+                if (value == null) {
+                    cont.cancel(IllegalStateException("GeckoResult completed with null"))
+                } else {
+                    cont.resume(value)
+                }
+            },
+            { error -> cont.cancel(error) }
+        )
+    }
 
 internal class GeckoMediaCapability : MediaCapable {
     override fun setAutoplayEnabled(enabled: Boolean) = Unit

@@ -16,6 +16,7 @@ import com.browserengine.core.capabilities.PermissionCapable
 import com.browserengine.core.capabilities.PopupCapable
 import com.browserengine.core.capabilities.ScreenshotCapable
 import com.browserengine.core.capabilities.StorageCapable
+import com.browserengine.core.capabilities.TemporaryStorageCapable
 import com.browserengine.core.capabilities.UICapable
 
 fun interface WebViewCapabilityInstaller {
@@ -38,6 +39,7 @@ object WebViewCapabilityInstallers {
         permissions(),
         cookies(),
         storage(),
+        temporaryStorage(),
         screenshot(),
         archive(),
         navigation(),
@@ -68,6 +70,10 @@ object WebViewCapabilityInstallers {
 
     fun storage(): WebViewCapabilityInstaller = register(StorageCapable::class) { scope ->
         WebViewStorageCapability(scope.components.webView)
+    }
+
+    fun temporaryStorage(): WebViewCapabilityInstaller = register(TemporaryStorageCapable::class) { scope ->
+        WebViewTemporaryStorageCapability(scope.components.cacheDirectory)
     }
 
     fun screenshot(): WebViewCapabilityInstaller = register(ScreenshotCapable::class) { scope ->

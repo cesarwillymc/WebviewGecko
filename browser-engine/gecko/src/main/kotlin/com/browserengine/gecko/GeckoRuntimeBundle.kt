@@ -15,6 +15,7 @@ class GeckoRuntimeBundle(
     config: BrowserConfig,
     delegates: GeckoDelegateHub
 ) {
+    val cacheDirectory = context.cacheDir
     val runtime: GeckoRuntime = GeckoRuntime.create(context, createRuntimeSettings(config))
     val session: GeckoSession = GeckoSession(createSessionSettings(config)).apply {
         navigationDelegate = delegates.navigationDelegate

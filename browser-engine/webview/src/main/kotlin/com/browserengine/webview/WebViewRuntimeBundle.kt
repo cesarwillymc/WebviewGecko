@@ -14,6 +14,7 @@ class WebViewRuntimeBundle(
     config: BrowserConfig,
     delegates: WebViewDelegateHub
 ) {
+    val cacheDirectory = context.cacheDir
     val webView: WebView = WebView(context).apply {
         CookieManager.getInstance().setAcceptCookie(config.cookiesEnabled)
         settings.apply {
