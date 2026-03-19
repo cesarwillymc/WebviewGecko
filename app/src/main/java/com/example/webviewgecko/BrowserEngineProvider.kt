@@ -11,17 +11,15 @@ import com.browserengine.factory.BrowserCapabilities
 import com.browserengine.factory.BrowserEngineFactory
 import com.browserengine.factory.DecoratorOptions
 import com.browserengine.factory.EngineFeatureValidation
-import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class BrowserEngineProvider @Inject constructor(
-    @param:ApplicationContext private val context: Context,
     private val permissionCoordinator: BrowserPermissionCoordinator,
     private val featureManager: BrowserFeatureOnDemandManager
 ) {
-    fun build(type: EngineType): BrowserEngine {
+    fun build(context: Context, type: EngineType): BrowserEngine {
         return BrowserEngineFactory.Builder(
             context = context,
             type = type

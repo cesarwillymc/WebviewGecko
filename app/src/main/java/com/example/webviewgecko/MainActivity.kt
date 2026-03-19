@@ -68,6 +68,10 @@ fun BrowserScreen(
     val fallbackState = remember { MutableStateFlow(BrowserState()) }
     val state by (engine?.state ?: fallbackState).collectAsState()
 
+    LaunchedEffect(context) {
+        viewModel.ensureEngine(com.browserengine.core.EngineType.GECKO, context)
+    }
+
     DisposableEffect(engine) {
         engine?.loadUrl(Script.robinhoodULR)
         onDispose { }

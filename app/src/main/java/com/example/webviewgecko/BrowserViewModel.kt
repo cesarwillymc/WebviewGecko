@@ -1,6 +1,7 @@
 package com.example.webviewgecko
 
 import android.Manifest
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -51,16 +52,15 @@ class BrowserViewModel @Inject constructor(
     val featureSheetState: StateFlow<BrowserFeatureSheetState> = featureManager.sheetState
 
     init {
-        ensureEngine(EngineType.GECKO)
     }
 
-    fun ensureEngine(type: EngineType) {
+    fun ensureEngine(type: EngineType, context: Context) {
         if (_engine.value != null) return
 
         viewModelScope.launch {
             runCatching {
                 featureManager.downloadAndShowModal(type) {
-                    _engine.value = engineProvider.build(type)
+                    _engine.value = engineProvider.build(context, type)
                 }
             }.onFailure { error ->
                 Log.e(LOG_TAG, "Failed to build engine", error)
