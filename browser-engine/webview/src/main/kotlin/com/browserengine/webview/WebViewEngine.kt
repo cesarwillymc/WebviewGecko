@@ -58,6 +58,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.reflect.KClass
+import androidx.core.graphics.createBitmap
 
 @SuppressLint("SetJavaScriptEnabled")
 class WebViewEngine(
@@ -327,12 +328,6 @@ class WebViewEngine(
         }
     }
 
-    override fun registerNativeFunction(name: String, handler: (args: String) -> String) {
-        webView.addJavascriptInterface(object {
-            @android.webkit.JavascriptInterface
-            fun invoke(args: String) = handler(args)
-        }, name)
-    }
 
     override suspend fun postMessageToJs(channel: String, data: String): Result<Unit> =
         evaluateScript("window.postMessage?.({channel:'$channel',data:'$data'},'*')").map { }
@@ -402,14 +397,9 @@ class WebViewEngine(
         onSelected(videoSources.firstOrNull(), audioSources.firstOrNull())
     }
 
-    // CookieCapable
-    override fun setCookiesEnabled(enabled: Boolean) {
-        CookieManager.getInstance().setAcceptCookie(enabled)
-    }
-
     override suspend fun getCookies(url: String): List<com.browserengine.core.capabilities.BrowserCookie> =
         withContext(Dispatchers.Main) {
-            CookieManager.getInstance().getCookie(url)?.split(";")?.mapNotNull { part ->
+            CookieManager.getInstance().getCookie(url)?.split(";")?.map { part ->
                 val (name, value) = part.trim().split("=", limit = 2)
                 com.browserengine.core.capabilities.BrowserCookie(name, value, java.net.URL(url).host)
             } ?: emptyList()
@@ -464,7 +454,7 @@ class WebViewEngine(
     // ScreenshotCapable
     override suspend fun captureScreenshot(): Result<android.graphics.Bitmap> = withContext(Dispatchers.Main) {
         kotlin.runCatching {
-            android.graphics.Bitmap.createBitmap(webView.width, webView.height, android.graphics.Bitmap.Config.ARGB_8888).apply {
+            createBitmap(webView.width, webView.height).apply {
                 webView.draw(android.graphics.Canvas(this))
             }
         }

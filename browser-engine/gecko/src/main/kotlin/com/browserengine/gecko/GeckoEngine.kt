@@ -1,5 +1,6 @@
 package com.browserengine.gecko
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
 import com.browserengine.core.BrowserCapability
@@ -55,6 +56,8 @@ import org.mozilla.geckoview.GeckoView
 import org.mozilla.geckoview.GeckoSession.Loader
 import org.mozilla.geckoview.WebExtension
 import org.json.JSONObject
+import org.mozilla.geckoview.GeckoSessionSettings
+import org.mozilla.geckoview.GeckoSessionSettings.USER_AGENT_MODE_MOBILE
 import kotlin.reflect.KClass
 
 /**
@@ -94,6 +97,7 @@ class GeckoEngine(
     private val runtime: GeckoRuntime = GeckoRuntime.create(
         context,
         GeckoRuntimeSettings.Builder()
+            .remoteDebuggingEnabled(true)
             .contentBlocking(
                 ContentBlocking.Settings.Builder()
                     .cookieBehavior(if (config.cookiesEnabled) ContentBlocking.CookieBehavior.ACCEPT_ALL else ContentBlocking.CookieBehavior.ACCEPT_NONE)
@@ -102,7 +106,24 @@ class GeckoEngine(
             .build()
     )
 
-    val session: GeckoSession = GeckoSession().apply {
+    val session: GeckoSession = GeckoSession(
+
+        GeckoSessionSettings.Builder()
+            .usePrivateMode(false)
+            .useTrackingProtection(true)
+            .userAgentMode(USER_AGENT_MODE_MOBILE)
+            .apply {
+                config.userAgent?.let { userAgent->
+                    userAgentOverride(      userAgent)
+                }
+            }
+            .suspendMediaWhenInactive(true)
+            .allowJavascript(config.javaScriptEnabled)
+            .viewportMode(GeckoSessionSettings.VIEWPORT_MODE_MOBILE)
+            .displayMode(GeckoSessionSettings.DISPLAY_MODE_FULLSCREEN)
+            .build()
+    ).apply {
+
         navigationDelegate = createNavigationDelegate()
         contentDelegate = createContentDelegate()
         progressDelegate = createProgressDelegate()
@@ -117,12 +138,15 @@ class GeckoEngine(
     private var onErrorHandler: ((String) -> Unit)? = null
     private var onReadJsonHandler: ((String) -> Unit)? = null
     private val messagingPorts = mutableListOf<WebExtension.Port>()
+    private val pendingMessages = mutableListOf<JSONObject>()  // queue for when port is gone
+    private var isPortReady = false
 
     init {
         session.open(runtime)
         installMessagingExtension()
     }
 
+    @SuppressLint("WrongThread")
     private fun installMessagingExtension() {
         runtime.webExtensionController.ensureBuiltIn(
             "resource://android/assets/messaging/",
@@ -134,18 +158,23 @@ class GeckoEngine(
                 val delegate = object : WebExtension.MessageDelegate {
                     override fun onConnect(port: WebExtension.Port) {
                         Log.d("ScriptInjection", "onConnect ${port.name} ${port.sender.environmentType} ${port.sender.url} ${port.sender.session?.userAgent}")
-                        messagingPorts.add(port)
                         port.setDelegate(object : WebExtension.PortDelegate {
                             override fun onPortMessage(message: Any, port: WebExtension.Port) {
                                 Log.d("ScriptInjection", "onPortMessage: $message")
-
-                                // Messages from content script - already handled via port
                             }
+
                             override fun onDisconnect(port: WebExtension.Port) {
                                 Log.d("ScriptInjection", "onDisconnect ${port.name}")
                                 messagingPorts.remove(port)
+                                isPortReady = messagingPorts.isNotEmpty() // still ready if other ports exist
+                                Log.d("ScriptInjection", "Remaining ports: ${messagingPorts.size}")
                             }
                         })
+                        messagingPorts.add(port)
+                        isPortReady = true
+
+// Flush any messages that were queued while port was gone
+                        flushPendingMessages()
                     }
 
                     override fun onMessage(
@@ -164,9 +193,8 @@ class GeckoEngine(
                             "onError" -> onErrorHandler?.invoke(text)
                             "onReadJson" -> onReadJsonHandler?.invoke(text)
                         }
-                        val response = messageListeners.asSequence()
-                            .mapNotNull { it.onMessage(text) }
-                            .firstOrNull()
+                        val response = messageListeners
+                            .firstNotNullOfOrNull { it.onMessage(text) }
                         return if (response != null) {
                             GeckoResult.fromValue(JSONObject().apply { put("reply", response) })
                         } else {
@@ -174,14 +202,27 @@ class GeckoEngine(
                         }
                     }
                 }
-                scope.launch {
-                    session.webExtensionController.setMessageDelegate(extension, delegate, "browser")
-                }
+                session.webExtensionController.setMessageDelegate(extension, delegate, "browser")
             },
-            { e -> android.util.Log.e("GeckoEngine", "Messaging extension install failed", e) }
+            { e -> Log.e("GeckoEngine", "Messaging extension install failed", e) }
         )
     }
-
+    // Add this helper
+    private fun flushPendingMessages() {
+        if (messagingPorts.isEmpty()) return
+        val iterator = pendingMessages.iterator()
+        while (iterator.hasNext()) {
+            val payload = iterator.next()
+            try {
+                messagingPorts.forEach { it.postMessage(payload) }
+                iterator.remove()
+                Log.d("ScriptInjection", "Flushed queued message: $payload")
+            } catch (e: Exception) {
+                Log.w("GeckoEngine", "Failed to flush message", e)
+                break // stop flushing, port may be broken
+            }
+        }
+    }
     private var defaultHeaders: Map<String, String> = emptyMap()
     private var requestInterceptor: RequestInterceptor? = null
     private var navigationInterceptor: NavigationInterceptor? = null
@@ -363,44 +404,106 @@ class GeckoEngine(
             modifier = modifier
         )
     }
+    private val SEND_MESSAGE_REPLACEMENT = """
+function sendMessageToHost(message, isError = false) {
+    window.postMessage({
+      type: "FROM_PAGE",
+      method: isError ? "onError" : "onReadJson",
+      message: message
+    }, "*");
+}
+""".trimIndent()
 
-    override suspend fun evaluateScript(script: String): Result<String> = withContext(Dispatchers.Main) {
-        if (messagingPorts.isEmpty()) {
-            return@withContext Result.failure(IllegalStateException("Messaging extension not ready; no ports connected"))
+    private val FUNCTION_START = Regex("""function\s+sendMessageToHost\s*\([^)]*\)\s*\{""")
+
+
+    private fun replaceSendMessageToHost(script: String): String {
+        val result = StringBuilder()
+        var searchFrom = 0
+
+        while (true) {
+            val match = FUNCTION_START.find(script, searchFrom) ?: break
+
+            // Append everything before this match
+            result.append(script, searchFrom, match.range.first)
+            result.append(SEND_MESSAGE_REPLACEMENT)
+
+            // Walk forward counting braces to find the matching closing }
+            var depth = 0
+            var i = match.range.last // points at the opening {
+
+            while (i < script.length) {
+                when (script[i]) {
+                    '{' -> depth++
+                    '}' -> {
+                        depth--
+                        if (depth == 0) {
+                            // Skip past this closing brace and continue scanning
+                            searchFrom = i + 1
+                            break
+                        }
+                    }
+                }
+                i++
+            }
+
+            if (depth != 0) {
+                // Unbalanced braces — bail out, append the rest as-is
+                result.append(script, match.range.first, script.length)
+                return result.toString()
+            }
         }
-        val payload = JSONObject().apply {
-            put("action", "evaluate")
-            put("script", script)
-        }
-        try {
-            messagingPorts.forEach { it.postMessage(payload) }
-            Result.success("")
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+
+        // Append whatever remains after the last replacement
+        result.append(script, searchFrom, script.length)
+        return result.toString()
     }
+    // Update evaluateScript to queue instead of fail:
+    override suspend fun evaluateScript(script: String): Result<String> =
+        withContext(Dispatchers.Main) {
+            val patched = replaceSendMessageToHost(script)
+            val payload = JSONObject().apply {
+                put("action", "evaluate")
+                put("script", patched)
+            }
+            if (messagingPorts.isEmpty()) {
+                pendingMessages.add(payload)  // ← queue it, don't fail
+                return@withContext Result.success("queued")
+            }
+            try {
+                messagingPorts.forEach { it.postMessage(payload) }
+                Result.success("")
+            } catch (e: Exception) {
+                pendingMessages.add(payload) // ← queue on send failure too
+                Result.failure(e)
+            }
+        }
+
+    // Same pattern for postMessageToJs:
+    override suspend fun postMessageToJs(channel: String, data: String): Result<Unit> =
+        withContext(Dispatchers.Main) {
+            val payload = JSONObject().apply {
+                put("action", "postMessage")
+                put("channel", channel)
+                put("data", data)
+            }
+            if (messagingPorts.isEmpty()) {
+                pendingMessages.add(payload)
+                return@withContext Result.success(Unit) // don't crash callers
+            }
+            try {
+                messagingPorts.forEach { it.postMessage(payload) }
+                Result.success(Unit)
+            } catch (e: Exception) {
+                pendingMessages.add(payload)
+                Result.failure(e)
+            }
+        }
 
     override suspend fun injectScriptFromAssets(assetPath: String): Result<Unit> =
         Result.failure(UnsupportedOperationException("GeckoView requires WebExtension for script injection"))
 
-    override fun registerNativeFunction(name: String, handler: (args: String) -> String) {}
 
-    override suspend fun postMessageToJs(channel: String, data: String): Result<Unit> = withContext(Dispatchers.Main) {
-        if (messagingPorts.isEmpty()) {
-            return@withContext Result.failure(IllegalStateException("Messaging extension not ready; no ports connected"))
-        }
-        val payload = JSONObject().apply {
-            put("action", "postMessage")
-            put("channel", channel)
-            put("data", data)
-        }
-        try {
-            messagingPorts.forEach { it.postMessage(payload) }
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
 
     // MessagingBridgeCapable
     override val bridgeName: String get() = "browser"
@@ -427,7 +530,7 @@ class GeckoEngine(
             try {
                 port.postMessage(payload)
             } catch (e: Exception) {
-                android.util.Log.w("GeckoEngine", "postMessage to port failed", e)
+                Log.w("GeckoEngine", "postMessage to port failed", e)
             }
         }
     }
@@ -450,11 +553,6 @@ class GeckoEngine(
         onSelected(videoSources.firstOrNull(), audioSources.firstOrNull())
     }
 
-    override fun setCookiesEnabled(enabled: Boolean) {
-        // Gecko: cookie behavior is set at runtime creation via config.cookiesEnabled.
-        // Cannot change at runtime; use BrowserConfig(cookiesEnabled = ...) when creating the engine.
-        android.util.Log.w("GeckoEngine", "setCookiesEnabled: Gecko requires config at creation; current config.cookiesEnabled=${config.cookiesEnabled}")
-    }
 
     override suspend fun getCookies(url: String): List<com.browserengine.core.capabilities.BrowserCookie> = emptyList()
 
@@ -513,9 +611,8 @@ class GeckoEngine(
     override suspend fun getHistory(): List<HistoryEntry> = emptyList()
 
     override fun setUrlFilter(filter: UrlFilter?) { urlFilter = filter }
-
     override fun setUserAgent(userAgent: String) {
-        runtime.settings.javaScriptEnabled = true // placeholder - userAgentOverride may vary by version
+        TODO("Not yet implemented")
     }
 
     override fun getUserAgent(): String = ""

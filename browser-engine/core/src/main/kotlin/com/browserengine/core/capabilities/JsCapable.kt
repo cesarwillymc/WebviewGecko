@@ -22,7 +22,6 @@ interface JsCapable : BrowserCapability {
      * WebView: addJavascriptInterface(@JavascriptInterface)
      * Gecko: WebExtension MessageDelegate + sendNativeMessage
      */
-    fun registerNativeFunction(name: String, handler: (args: String) -> String)
 
     /**
      * Sends a message to already-injected JS.

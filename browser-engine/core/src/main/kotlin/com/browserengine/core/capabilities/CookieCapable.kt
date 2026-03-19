@@ -4,13 +4,6 @@ import com.browserengine.core.BrowserCapability
 
 interface CookieCapable : BrowserCapability {
     /**
-     * Enable or disable cookies globally.
-     * WebView: CookieManager.setAcceptCookie(accept)
-     * Gecko: ContentBlocking.CookieBehavior (set at runtime creation via config)
-     */
-    fun setCookiesEnabled(enabled: Boolean)
-
-    /**
      * Get all cookies for a URL.
      * WebView: CookieManager.getCookie(url)
      * Gecko: No public API — returns empty list
