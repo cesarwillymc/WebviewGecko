@@ -13,13 +13,19 @@ import com.browserengine.decorators.AnalyticsCallback
 import com.browserengine.decorators.LoggingBrowserDecorator
 import com.browserengine.decorators.SecurityBrowserDecorator
 import com.browserengine.decorators.SecurityMode
-import com.browserengine.gecko.GeckoEngine
-import com.browserengine.gecko.GeckoCapabilityInstallers
 import com.browserengine.webview.WebViewEngine
-import com.browserengine.webview.WebViewCapabilityInstallers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.reflect.KClass
+
+private val defaultEngineCreators = mapOf<EngineType, EngineCreator>(
+    EngineType.WEBVIEW to EngineCreator { context, config ->
+        WebViewEngine.Builder(context)
+            .settings(config)
+            .addDefaultCapabilities()
+            .build()
+    }
+)
 
 data class DecoratorOptions(
     val logging: Boolean = false,
@@ -40,6 +46,7 @@ object BrowserEngineFactory {
         private var decoratorOptions: DecoratorOptions = DecoratorOptions()
         private val capabilities = mutableListOf<BrowserEngineCapability>()
         private var exposeAllCapabilities: Boolean = false
+        private var featureValidator: EngineFeatureValidator? = null
 
         fun settings(): Builder = this
 
@@ -51,6 +58,10 @@ object BrowserEngineFactory {
             this.decoratorOptions = options
         }
 
+        fun featureValidator(validator: EngineFeatureValidator): Builder = apply {
+            this.featureValidator = validator
+        }
+
         fun addCapability(capability: BrowserEngineCapability): Builder = apply {
             capabilities += capability
         }
@@ -60,6 +71,12 @@ object BrowserEngineFactory {
         }
 
         fun build(): BrowserEngine {
+            featureValidator?.validate(type)?.let { validation ->
+                check(validation.isValid) {
+                    validation.reason ?: "Engine feature validation failed for $type"
+                }
+            }
+
             val rawEngine = createBaseEngine(context, type, config)
             val enabledCapabilities = linkedSetOf<KClass<out BrowserCapability>>(
                 UICapable::class,
@@ -99,16 +116,9 @@ object BrowserEngineFactory {
         type: EngineType,
         config: BrowserConfig
     ): BrowserEngine {
-        return when (type) {
-            EngineType.WEBVIEW -> WebViewEngine.Builder(context)
-                .settings(config)
-                .addDefaultCapabilities()
-                .build()
-            EngineType.GECKO -> GeckoEngine.Builder(context)
-                .settings(config)
-                .addDefaultCapabilities()
-                .build()
-        }
+        val creator = EngineCreatorRegistry.get(type) ?: defaultEngineCreators[type]
+        checkNotNull(creator) { "No engine creator registered for $type" }
+        return creator.create(context, config)
     }
 
     private fun applyDecorators(

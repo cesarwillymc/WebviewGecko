@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.browserengine.core.BrowserEngine
+import com.browserengine.core.EngineType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,15 +36,37 @@ fun permissionStringsToAndroidManifest(permissions: List<String>): List<String> 
 
 @HiltViewModel
 class BrowserViewModel @Inject constructor(
-    val engine: BrowserEngine,
-    private val permissionCoordinator: BrowserPermissionCoordinator
+    private val engineProvider: BrowserEngineProvider,
+    private val permissionCoordinator: BrowserPermissionCoordinator,
+    private val featureManager: BrowserFeatureOnDemandManager
 ) : ViewModel() {
+    private val _engine = MutableStateFlow<BrowserEngine?>(null)
+    val engine: StateFlow<BrowserEngine?> = _engine.asStateFlow()
 
     private val _bridgeLogs = MutableStateFlow<List<String>>(emptyList())
     val bridgeLogs: StateFlow<List<String>> = _bridgeLogs.asStateFlow()
 
     val pendingPermissionRequest: StateFlow<BrowserPermissionCoordinator.PendingPermissionRequest?> =
         permissionCoordinator.pendingPermissionRequest
+    val featureSheetState: StateFlow<BrowserFeatureSheetState> = featureManager.sheetState
+
+    init {
+        ensureEngine(EngineType.GECKO)
+    }
+
+    fun ensureEngine(type: EngineType) {
+        if (_engine.value != null) return
+
+        viewModelScope.launch {
+            runCatching {
+                featureManager.downloadAndShowModal(type) {
+                    _engine.value = engineProvider.build(type)
+                }
+            }.onFailure { error ->
+                Log.e(LOG_TAG, "Failed to build engine", error)
+            }
+        }
+    }
 
     /** Call when user taps Grant and no Android runtime request is needed. */
     fun grantPermission() {
@@ -59,16 +82,17 @@ class BrowserViewModel @Inject constructor(
         permissionCoordinator.denyPermission()
     }
     fun startInjection() {
+        val currentEngine = engine.value ?: return
         fun log(source: String, message: String) {
             Log.d(LOG_TAG, "[$source] $message")
             _bridgeLogs.update { it + "[$source] $message" }
         }
 
-        engine.setOnErrorHandler { msg -> log("onError", msg) }
-        engine.setOnReadJsonHandler { msg -> log("onReadJson", msg) }
+        currentEngine.setOnErrorHandler { msg -> log("onError", msg) }
+        currentEngine.setOnReadJsonHandler { msg -> log("onReadJson", msg) }
 
         viewModelScope.launch {
-            engine.injectScript(Script.robinhood)
+            currentEngine.injectScript(Script.robinhood)
                 .onSuccess {
                     log("inject", "Script.ibkr injected successfully")
                 }
@@ -79,9 +103,10 @@ class BrowserViewModel @Inject constructor(
     }
 
     fun sendExampleMessage() {
+        val currentEngine = engine.value ?: return
         val exampleData = """{"message":"Hello from Android","timestamp":${System.currentTimeMillis()}}"""
         viewModelScope.launch {
-            engine.postMessageToJs("example", exampleData)
+            currentEngine.postMessageToJs("example", exampleData)
                 .onSuccess {
                     Log.d(LOG_TAG, "postMessageToJs sent: channel=example, data=$exampleData")
                 }
@@ -92,7 +117,7 @@ class BrowserViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        engine.destroy()
+        _engine.value?.destroy()
         super.onCleared()
     }
 }

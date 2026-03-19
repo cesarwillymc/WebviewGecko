@@ -1,4 +1,4 @@
-package com.example.webviewgecko.di
+package com.example.webviewgecko
 
 import android.content.Context
 import android.util.Log
@@ -10,28 +10,30 @@ import com.browserengine.core.capabilities.NavigationResult
 import com.browserengine.factory.BrowserCapabilities
 import com.browserengine.factory.BrowserEngineFactory
 import com.browserengine.factory.DecoratorOptions
-import com.example.webviewgecko.BrowserPermissionCoordinator
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
+import com.browserengine.factory.EngineFeatureValidation
 import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
+import javax.inject.Inject
 import javax.inject.Singleton
 
-@Module
-@InstallIn(SingletonComponent::class)
-object BrowserModule {
-
-    @Provides
-    @Singleton
-    fun provideBrowserEngine(
-        @ApplicationContext context: Context,
-        permissionCoordinator: BrowserPermissionCoordinator
-    ): BrowserEngine {
+@Singleton
+class BrowserEngineProvider @Inject constructor(
+    @param:ApplicationContext private val context: Context,
+    private val permissionCoordinator: BrowserPermissionCoordinator,
+    private val featureManager: BrowserFeatureOnDemandManager
+) {
+    fun build(type: EngineType): BrowserEngine {
         return BrowserEngineFactory.Builder(
             context = context,
-            type = EngineType.GECKO
+            type = type
         )
+            .featureValidator { engineType ->
+                val (isValid, reason) = featureManager.buildValidation(engineType)
+                if (isValid) {
+                    EngineFeatureValidation.valid()
+                } else {
+                    EngineFeatureValidation.invalid(reason ?: "Feature unavailable")
+                }
+            }
             .settings(
                 BrowserConfig(
                     javaScriptEnabled = true,
@@ -42,8 +44,8 @@ object BrowserModule {
             .addCapability(BrowserCapabilities.navigation())
             .addCapability(BrowserCapabilities.javaScript())
             .addCapability(BrowserCapabilities.navigationOverride(NavigationInterceptor { request ->
-                Log.e("provideBrowserEngine", "provideBrowserEngine: ${request.url}")
-                return@NavigationInterceptor NavigationResult.Allow
+                Log.e("BrowserEngineProvider", "Navigation request: ${request.url}")
+                NavigationResult.Allow
             }))
             .addCapability(BrowserCapabilities.messaging())
             .addCapability(BrowserCapabilities.permissions(permissionCoordinator::onPermissionRequested))
