@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.browserengine.core.BrowserEngine
 import com.browserengine.core.capabilities.JsCapable
 import com.browserengine.core.capabilities.MessagingBridgeCapable
+import com.browserengine.core.capabilities.PermissionCapable
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,7 +24,14 @@ class BrowserViewModel @Inject constructor(
 
     private val _bridgeLogs = MutableStateFlow<List<String>>(emptyList())
     val bridgeLogs: StateFlow<List<String>> = _bridgeLogs.asStateFlow()
+    init {
 
+        engine.capability(PermissionCapable::class)?.let {
+            it.setPermissionRequestHandler { permissions, onGrant, onDeny ->
+                permissions
+            }
+        }
+    }
     fun startInjection() {
         val bridge = engine.capability(MessagingBridgeCapable::class) ?: return
         val js = engine.capability(JsCapable::class) ?: return
@@ -61,6 +69,9 @@ class BrowserViewModel @Inject constructor(
         }
     }
 
+    init {
+
+    }
     override fun onCleared() {
         engine.destroy()
         super.onCleared()

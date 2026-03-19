@@ -8,13 +8,19 @@ interface PermissionCapable : BrowserCapability {
     val grantedPermissions: StateFlow<Set<BrowserPermission>>
 
     /**
+     * Set handler for permission requests (camera, mic, notifications, etc).
+     * When null or not set, requests are denied.
+     */
+    fun setPermissionRequestHandler(handler: ((List<String>, () -> Unit, () -> Unit) -> Unit)?)
+
+    /**
      * Called when engine needs Android-level permission.
      * Both engines need: CAMERA, RECORD_AUDIO, ACCESS_FINE_LOCATION
      * WebView: onPermissionRequest → PermissionRequest.grant()
      * Gecko: onAndroidPermissionsRequest → Callback.grant()
      */
     fun onPermissionRequested(
-        permissions: List<BrowserPermission>,
+        permissions: List<String>,
         onGrant: () -> Unit,
         onDeny: () -> Unit
     )

@@ -231,7 +231,7 @@ class GeckoEngine(
     private var popupCloseHandler: PopupCloseHandler? = null
     override var allowBackgroundPopups: Boolean = false
 
-    private var permissionRequestHandler: ((List<com.browserengine.core.capabilities.BrowserPermission>, () -> Unit, () -> Unit) -> Unit)? = null
+    private var permissionRequestHandler: ((List<String>, () -> Unit, () -> Unit) -> Unit)? = null
 
     private fun createNavigationDelegate() = object : GeckoSession.NavigationDelegate {
         override fun onLocationChange(session: GeckoSession, url: String?, perms: MutableList<GeckoSession.PermissionDelegate.ContentPermission>, hasUserGesture: Boolean) {
@@ -319,36 +319,13 @@ class GeckoEngine(
             permissions: Array<out String>?,
             callback: GeckoSession.PermissionDelegate.Callback
         ) {
+            Log.e(
+                "createPermissionDelegate",
+                "onAndroidPermissionsRequest frommm android requesttt: ${permissions}"
+            )
             permissionRequestHandler?.invoke(
-                emptyList(),
+                permissions.orEmpty().toList(),
                 { callback.grant() },
-                { callback.reject() }
-            ) ?: callback.reject()
-        }
-
-        override fun onContentPermissionRequest(
-            session: GeckoSession,
-            perm: GeckoSession.PermissionDelegate.ContentPermission
-        ): GeckoResult<Int> {
-            val result = GeckoResult<Int>()
-            permissionRequestHandler?.invoke(
-                listOf(com.browserengine.core.capabilities.BrowserPermission.NOTIFICATIONS),
-                { result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW) },
-                { result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY) }
-            ) ?: result.complete(GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY)
-            return result
-        }
-
-        override fun onMediaPermissionRequest(
-            session: GeckoSession,
-            uri: String,
-            video: Array<out GeckoSession.PermissionDelegate.MediaSource>?,
-            audio: Array<out GeckoSession.PermissionDelegate.MediaSource>?,
-            callback: GeckoSession.PermissionDelegate.MediaCallback
-        ) {
-            permissionRequestHandler?.invoke(
-                listOf(com.browserengine.core.capabilities.BrowserPermission.CAMERA, com.browserengine.core.capabilities.BrowserPermission.MICROPHONE),
-                { callback.grant(video?.firstOrNull(), audio?.firstOrNull()) },
                 { callback.reject() }
             ) ?: callback.reject()
         }
@@ -356,7 +333,7 @@ class GeckoEngine(
 
     private val popupEngines = mutableListOf<BrowserEngine>()
 
-    fun setPermissionRequestHandler(handler: ((List<com.browserengine.core.capabilities.BrowserPermission>, () -> Unit, () -> Unit) -> Unit)?) {
+    override fun setPermissionRequestHandler(handler: ((List<String>, () -> Unit, () -> Unit) -> Unit)?) {
         permissionRequestHandler = handler
     }
 
@@ -536,10 +513,11 @@ function sendMessageToHost(message, isError = false) {
     }
 
     override fun onPermissionRequested(
-        permissions: List<com.browserengine.core.capabilities.BrowserPermission>,
+        permissions: List<String>,
         onGrant: () -> Unit,
         onDeny: () -> Unit
     ) {
+        Log.w("GeckoEngine", "onPermissionRequested permissions ${permissions}")
         permissionRequestHandler?.invoke(permissions, onGrant, onDeny) ?: onDeny()
     }
 

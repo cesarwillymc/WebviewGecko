@@ -140,7 +140,7 @@ class WebViewEngine(
     private var popupCloseHandler: PopupCloseHandler? = null
     override var allowBackgroundPopups: Boolean = false
 
-    private var permissionRequestHandler: ((List<com.browserengine.core.capabilities.BrowserPermission>, () -> Unit, () -> Unit) -> Unit)? = null
+    private var permissionRequestHandler: ((List<String>, () -> Unit, () -> Unit) -> Unit)? = null
     private var pendingPermissionGrant: (() -> Unit)? = null
     private var pendingPermissionDeny: (() -> Unit)? = null
 
@@ -368,12 +368,12 @@ class WebViewEngine(
     }
 
     // PermissionCapable
-    fun setPermissionRequestHandler(handler: ((List<com.browserengine.core.capabilities.BrowserPermission>, () -> Unit, () -> Unit) -> Unit)?) {
+    override fun setPermissionRequestHandler(handler: ((List<String>, () -> Unit, () -> Unit) -> Unit)?) {
         permissionRequestHandler = handler
     }
 
     override fun onPermissionRequested(
-        permissions: List<com.browserengine.core.capabilities.BrowserPermission>,
+        permissions: List<String>,
         onGrant: () -> Unit,
         onDeny: () -> Unit
     ) {
